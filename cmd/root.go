@@ -140,7 +140,12 @@ func downloadRun(cmd *cobra.Command, args []string) error {
 		Proxy:      downloadOpts.proxy,
 	}
 
-	for _, url := range args {
+	for _, rawURL := range args {
+		url := downloader.SanitizeURL(rawURL)
+		if url != rawURL {
+			fmt.Printf("  Cleaned URL: %s\n", url)
+		}
+
 		if interactive {
 			if containerFmt == "" {
 				selected, err := tui.SelectContainerFormat()
@@ -207,8 +212,8 @@ func friendlyError(msg string, err error) error {
 }
 
 func infoRun(cmd *cobra.Command, args []string) error {
-	url := args[0]
 	ctx := context.Background()
+	url := downloader.SanitizeURL(args[0])
 
 	fmt.Println(banner.String())
 	fmt.Println()
@@ -288,11 +293,15 @@ func searchRun(cmd *cobra.Command, args []string) error {
 		})
 	}
 
-	selectedURL, err := tui.SelectSearchResult(query, entries)
+	rawURL, err := tui.SelectSearchResult(query, entries)
 	if err != nil {
 		return friendlyError("search selection failed", err)
 	}
 
+	selectedURL := downloader.SanitizeURL(rawURL)
+	if selectedURL != rawURL {
+		fmt.Printf("  Cleaned URL: %s\n", selectedURL)
+	}
 	fmt.Printf("\nDownloading: %s\n\n", selectedURL)
 
 	outputDir := downloadOpts.outputDir
