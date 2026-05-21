@@ -41,6 +41,7 @@ var (
 		audioOnly  bool
 		rateLimit  string
 		proxy      string
+		pickFormat bool
 	}
 )
 
@@ -87,8 +88,9 @@ func init() {
 	rootCmd.Flags().SortFlags = false
 	downloadCmd.Flags().SortFlags = false
 
+	downloadCmd.Flags().BoolVarP(&downloadOpts.pickFormat, "format", "f", false, "interactively select output format and resolution")
 	downloadCmd.Flags().StringVarP(&downloadOpts.quality, "quality", "q", "", "video quality (best, 1080p, 720p, audio-only)")
-	downloadCmd.Flags().StringVarP(&downloadOpts.format, "format", "f", "", "output format (mp4, mkv, mp3, m4a)")
+	downloadCmd.Flags().StringVarP(&downloadOpts.format, "format-type", "", "", "output container (mp4, mkv, mp3, m4a)")
 	downloadCmd.Flags().StringVarP(&downloadOpts.outputDir, "output-dir", "o", "", "custom output directory")
 	downloadCmd.Flags().BoolVarP(&downloadOpts.noPlaylist, "no-playlist", "n", false, "download only single video, not playlist")
 	downloadCmd.Flags().BoolVarP(&downloadOpts.audioOnly, "audio-only", "a", false, "extract audio only")
@@ -110,11 +112,12 @@ func downloadRun(cmd *cobra.Command, args []string) error {
 		return friendlyError("failed to prepare output directory", err)
 	}
 
-	formatSet := cmd.Flags().Changed("format")
+	interactive := downloadOpts.pickFormat || downloadOpts.format != ""
+	containerFmt := downloadOpts.format
 
 	opts := downloader.Options{
 		Quality:    downloadOpts.quality,
-		Format:     downloadOpts.format,
+		Format:     containerFmt,
 		OutputDir:  outputDir,
 		NoPlaylist: downloadOpts.noPlaylist,
 		AudioOnly:  downloadOpts.audioOnly,
@@ -123,18 +126,27 @@ func downloadRun(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, url := range args {
-		if formatSet {
+		if interactive {
+			if containerFmt == "" {
+				selected, err := tui.SelectContainerFormat()
+				if err != nil {
+					return friendlyError("format selection cancelled", err)
+				}
+				containerFmt = selected
+				opts.Format = containerFmt
+			}
+
 			ctx := context.Background()
 			info, err := downloader.Info(ctx, url)
 			if err != nil {
 				return friendlyError("failed to fetch available formats", err)
 			}
 
-			selected, err := tui.SelectFormat(info)
+			quality, err := tui.SelectResolution(info)
 			if err != nil {
-				return friendlyError("format selection failed", err)
+				return friendlyError("resolution selection cancelled", err)
 			}
-			opts.Quality = selected
+			opts.Quality = quality
 		}
 
 		if err := tui.Start(url, opts); err != nil {

@@ -24,12 +24,35 @@ neodlp download [flags] <url> [url...]
 neodlp dl [flags] <url> [url...]
 ```
 
+### Interactive format selection
+
+Use `-f` to interactively choose a container format (mp4, mkv, mp3, m4a) followed
+by video resolution from the available options:
+
+```bash
+neodlp dl -f "https://youtu.be/dQw4w9WgXcQ"
+```
+
+This launches a two-step TUI:
+1. **Container picker** — select mp4, mkv, mp3, or m4a
+2. **Resolution picker** — select from available video resolutions (e.g. 1080p, 720p)
+
+Use `↑`/`↓` to navigate, `Enter` to select, `Esc` to cancel.
+
+To skip the container picker and jump straight to resolution selection, specify
+the format with `--format-type`:
+
+```bash
+neodlp dl -f --format-type mp4 "https://youtu.be/dQw4w9WgXcQ"
+```
+
 ### Flags
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
+| `--format` | `-f` | `false` | Interactively select output format and resolution |
 | `--quality` | `-q` | `best` | Video quality: `best`, `1080p`, `720p`, `audio-only` |
-| `--format` | `-f` | `auto` | Output format: `auto`, `mp4`, `mkv`, `mp3`, `m4a` |
+| `--format-type` | | `auto` | Output container: `mp4`, `mkv`, `mp3`, `m4a` |
 | `--output-dir` | `-o` | *config value* | Custom output directory |
 | `--no-playlist` | `-n` | `false` | Download only single video, not playlist |
 | `--audio-only` | `-a` | `false` | Extract audio only (overrides `--quality`) |
@@ -39,11 +62,26 @@ neodlp dl [flags] <url> [url...]
 ### Examples
 
 ```bash
+# Normal download (no selectors)
 neodlp dl "https://youtu.be/dQw4w9WgXcQ"
-neodlp download -q 1080p -f mp4 "https://youtu.be/dQw4w9WgXcQ"
+
+# Interactive format + resolution selection
+neodlp dl -f "https://youtu.be/dQw4w9WgXcQ"
+
+# Interactive resolution selection with mp4 container
+neodlp dl -f --format-type mp4 "https://youtu.be/dQw4w9WgXcQ"
+
+# Specify quality and format directly (no selectors)
+neodlp dl -q 1080p --format-type mp4 "https://youtu.be/dQw4w9WgXcQ"
+
+# Audio only
 neodlp dl -a "https://youtu.be/dQw4w9WgXcQ"
+
+# Rate limit and proxy
 neodlp dl -r 5M "https://youtu.be/dQw4w9WgXcQ"
 neodlp dl -p "http://127.0.0.1:8080" "https://youtu.be/dQw4w9WgXcQ"
+
+# Single video from playlist
 neodlp dl -n "https://youtube.com/playlist?list=PL..."
 ```
 

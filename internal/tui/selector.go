@@ -18,7 +18,9 @@ type formatItem struct {
 }
 
 type selectorModel struct {
-	items    []formatItem
+	title    string
+	helpText string
+	items    []string
 	cursor   int
 	selected int
 	done     bool
@@ -36,29 +38,86 @@ var (
 	dimStyle = lipgloss.NewStyle().Foreground(mutedColor)
 )
 
-func SelectFormat(info *ytdlp.ExtractedInfo) (string, error) {
-	heights := extractResolutions(info)
-	if len(heights) == 0 {
+func SelectContainerFormat() (string, error) {
+	containers := []string{"mp4", "mkv", "mp3", "m4a"}
+	m := selectorModel{
+		title:    " select container ",
+		helpText: "Choose a container format (↑/↓, Enter to select, Esc to cancel)",
+		items:    containers,
+	}
+	return runSelector(&m)
+}
+
+type resValue struct {
+	label string
+	value string
+}
+
+func SelectResolution(info *ytdlp.ExtractedInfo) (string, error) {
+	resolutions := extractResolutions(info)
+	if len(resolutions) == 0 {
 		return "", fmt.Errorf("no video formats found")
 	}
 
-	m := selectorModel{items: heights}
+	var resValues []resValue
+	for _, r := range resolutions {
+		label := fmt.Sprintf("%dp", r.height)
+		if r.note != "" && r.note != label {
+			label += " (" + r.note + ")"
+		}
+		if r.filesize > 0 {
+			label += " ~" + formatBytes(r.filesize)
+		}
+		resValues = append(resValues, resValue{
+			label: label,
+			value: fmt.Sprintf("%dp", r.height),
+		})
+	}
+
+	var labels []string
+	for _, rv := range resValues {
+		labels = append(labels, rv.label)
+	}
+
+	m := selectorModel{
+		title:    " select resolution ",
+		helpText: "Choose a resolution (↑/↓, Enter to select, Esc to cancel)",
+		items:    labels,
+	}
+
+	selected, err := runSelector(&m)
+	if err != nil {
+		return "", err
+	}
+	if selected == "" {
+		return "", fmt.Errorf("no resolution selected")
+	}
+
+	for _, rv := range resValues {
+		if rv.label == selected {
+			return rv.value, nil
+		}
+	}
+	return "", fmt.Errorf("no resolution selected")
+}
+
+func runSelector(m *selectorModel) (string, error) {
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	final, err := p.Run()
 	if err != nil {
 		return "", err
 	}
-	m, ok := final.(selectorModel)
+	m, ok := final.(*selectorModel)
 	if !ok {
 		return "", fmt.Errorf("unexpected model type")
 	}
 	if m.err != nil {
 		return "", m.err
 	}
-	if m.done && m.selected >= 0 && m.selected < len(heights) {
-		return fmt.Sprintf("%dp", heights[m.selected].height), nil
+	if m.done && m.selected >= 0 && m.selected < len(m.items) {
+		return m.items[m.selected], nil
 	}
-	return "", fmt.Errorf("no format selected")
+	return "", fmt.Errorf("no selection made")
 }
 
 func extractResolutions(info *ytdlp.ExtractedInfo) []formatItem {
@@ -95,11 +154,11 @@ func extractResolutions(info *ytdlp.ExtractedInfo) []formatItem {
 	return items
 }
 
-func (m selectorModel) Init() tea.Cmd {
+func (m *selectorModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m selectorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *selectorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -130,7 +189,7 @@ func (m selectorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m selectorModel) View() string {
+func (m *selectorModel) View() string {
 	var b strings.Builder
 
 	width := m.width
@@ -144,33 +203,25 @@ func (m selectorModel) View() string {
 	b.WriteString(lipgloss.NewStyle().
 		Width(width).
 		Align(lipgloss.Center).
-		Render(titleStyle.Render(" select format ")))
+		Render(titleStyle.Render(m.title)))
 	b.WriteString("\n\n")
 
-	b.WriteString("  " + dimStyle.Render("Choose a resolution (↑/↓, Enter to select, Esc to cancel)"))
+	b.WriteString("  " + dimStyle.Render(m.helpText))
 	b.WriteString("\n\n")
 
 	for i, item := range m.items {
-		label := fmt.Sprintf("%dp", item.height)
-		if item.note != "" && item.note != label {
-			label += " (" + item.note + ")"
-		}
-		if item.filesize > 0 {
-			label += dimStyle.Render(" ~" + formatBytes(item.filesize))
-		}
-
 		line := "  "
 		if i == m.cursor {
-			line += "▸ " + selectedStyle.Render(label)
+			line += "▸ " + selectedStyle.Render(item)
 		} else {
-			line += "  " + itemStyle.Render(label)
+			line += "  " + itemStyle.Render(item)
 		}
 		b.WriteString(line)
 		b.WriteString("\n")
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(fmt.Sprintf("  %d resolution(s) available", len(m.items))))
+	b.WriteString(dimStyle.Render(fmt.Sprintf("  %d option(s) available", len(m.items))))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())
 }
