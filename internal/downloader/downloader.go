@@ -166,7 +166,7 @@ func Info(ctx context.Context, url string) (*ytdlp.ExtractedInfo, error) {
 func extractPlatform(url string) string {
 	url = strings.ToLower(url)
 	switch {
-	case strings.Contains(url, "youtube.com"), strings.Contains(url, "youtu.be"):
+	case strings.Contains(url, "youtube.com"), strings.Contains(url, "youtu.be"), strings.Contains(url, "m.youtube.com"), strings.Contains(url, "music.youtube.com"), strings.Contains(url, "youtube-nocookie.com"), strings.Contains(url, "yt.be"):
 		return "youtube"
 	case strings.Contains(url, "instagram.com"):
 		return "instagram"
@@ -178,7 +178,7 @@ func extractPlatform(url string) string {
 		return "tiktok"
 	case strings.Contains(url, "t.me"), strings.Contains(url, "telegram.org"):
 		return "telegram"
-	case strings.Contains(url, "threads.net"):
+	case strings.Contains(url, "threads.net"), strings.Contains(url, "threads.com"):
 		return "threads"
 	case strings.Contains(url, "vimeo.com"):
 		return "vimeo"
