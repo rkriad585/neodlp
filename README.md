@@ -17,10 +17,10 @@ Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp) under the hood. Built with
 
 ## Features
 
-- **1000+ sites** — YouTube, Instagram, Facebook, X/Twitter, TikTok, Vimeo, Reddit, Telegram, and more
+- **1000+ sites** — YouTube, Instagram, Facebook, X/Twitter, TikTok, SoundCloud, Twitch, Vimeo, Reddit, Telegram, Dailymotion, Bandcamp, Mixcloud, Rumble, Bilibili, and more
 - **Interactive TUI** — real-time progress bar, speed, ETA, file size with BubbleTea
 - **Audio extraction** — download audio-only as MP3
-- **Format selection** — MP4, MKV, MP3, M4A; quality presets (best, 1080p, 720p)
+- **Format selection** — MP4, MKV, WebM, MOV, AVI, FLV, MP3, M4A, Opus, WAV; quality presets (best, 1080p, 720p)
 - **Playlist control** — download single video or full playlist
 - **Rate limiting** — throttle bandwidth (e.g. `10M`)
 - **Proxy support** — HTTP/HTTPS/SOCKS proxy
@@ -64,8 +64,14 @@ NeoDLP auto-downloads the `yt-dlp` binary on first run — no manual installatio
 # Download best quality (default)
 neodlp dl "https://youtu.be/dQw4w9WgXcQ"
 
+# Interactive format + resolution selection
+neodlp dl -f "https://youtu.be/dQw4w9WgXcQ"
+
+# Interactive resolution with specific format
+neodlp dl -f --format-type mp4 "https://youtu.be/dQw4w9WgXcQ"
+
 # Download with specific quality and format
-neodlp dl -q 1080p -f mp4 "https://youtu.be/dQw4w9WgXcQ"
+neodlp dl -q 1080p --format-type mp4 "https://youtu.be/dQw4w9WgXcQ"
 
 # Extract audio only
 neodlp dl -a "https://youtu.be/dQw4w9WgXcQ"
@@ -81,6 +87,16 @@ neodlp dl -p "http://127.0.0.1:8080" "https://youtu.be/dQw4w9WgXcQ"
 
 # Multiple URLs
 neodlp dl "https://youtu.be/abc" "https://youtu.be/xyz"
+```
+
+### Search and download
+
+```bash
+# Search YouTube, pick from results interactively
+neodlp search "never gonna give you up"
+
+# Limit search results
+neodlp search -l 5 "lofi hip hop music"
 ```
 
 ### View media info
@@ -143,7 +159,7 @@ cookies_from_browser = ""
 |-----|------|-------------|
 | `download.output_dir` | string | Output directory for downloads |
 | `download.quality` | string | Quality preset: `best`, `1080p`, `720p`, `audio-only` |
-| `download.format` | string | Output format: `auto`, `mp4`, `mkv`, `mp3`, `m4a` |
+| `download.format` | string | Output format: `auto`, `mp4`, `mkv`, `webm`, `mov`, `avi`, `flv`, `mp3`, `m4a`, `opus`, `wav` |
 | `download.concurrent_fragments` | int | Number of concurrent fragment downloads |
 | `download.rate_limit` | string | Bandwidth limit (e.g. `10M`, `5M`) |
 | `network.proxy` | string | Proxy URL (HTTP/HTTPS/SOCKS) |

@@ -176,7 +176,7 @@ func extractPlatform(url string) string {
 		return "twitter"
 	case strings.Contains(url, "tiktok.com"):
 		return "tiktok"
-	case strings.Contains(url, "t.me"), strings.Contains(url, "telegram"):
+	case strings.Contains(url, "t.me"), strings.Contains(url, "telegram.org"):
 		return "telegram"
 	case strings.Contains(url, "threads.net"):
 		return "threads"
@@ -186,6 +186,36 @@ func extractPlatform(url string) string {
 		return "reddit"
 	case strings.Contains(url, "pinterest.com"):
 		return "pinterest"
+	case strings.Contains(url, "soundcloud.com"):
+		return "soundcloud"
+	case strings.Contains(url, "twitch.tv"), strings.Contains(url, "twitch.com"):
+		return "twitch"
+	case strings.Contains(url, "dailymotion.com"):
+		return "dailymotion"
+	case strings.Contains(url, "bandcamp.com"):
+		return "bandcamp"
+	case strings.Contains(url, "mixcloud.com"):
+		return "mixcloud"
+	case strings.Contains(url, "rumble.com"):
+		return "rumble"
+	case strings.Contains(url, "odysee.com"):
+		return "odysee"
+	case strings.Contains(url, "bilibili.com"):
+		return "bilibili"
+	case strings.Contains(url, "dailymail.co.uk"):
+		return "dailymail"
+	case strings.Contains(url, "abc.net.au"):
+		return "abc_au"
+	case strings.Contains(url, "nbc.com"):
+		return "nbc"
+	case strings.Contains(url, "cbssports.com"), strings.Contains(url, "cbsnews.com"):
+		return "cbs"
+	case strings.Contains(url, "bbc.co.uk"), strings.Contains(url, "bbc.com"):
+		return "bbc"
+	case strings.Contains(url, "patreon.com"):
+		return "patreon"
+	case strings.Contains(url, "linkedin.com"):
+		return "linkedin"
 	default:
 		return "unknown"
 	}

@@ -39,7 +39,7 @@ var (
 )
 
 func SelectContainerFormat() (string, error) {
-	containers := []string{"mp4", "mkv", "mp3", "m4a"}
+	containers := []string{"mp4", "mkv", "webm", "mov", "avi", "flv", "mp3", "m4a", "opus", "wav"}
 	m := selectorModel{
 		title:    " select container ",
 		helpText: "Choose a container format (↑/↓, Enter to select, Esc to cancel)",

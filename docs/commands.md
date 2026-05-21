@@ -52,7 +52,7 @@ neodlp dl -f --format-type mp4 "https://youtu.be/dQw4w9WgXcQ"
 |------|-------|---------|-------------|
 | `--format` | `-f` | `false` | Interactively select output format and resolution |
 | `--quality` | `-q` | `best` | Video quality: `best`, `1080p`, `720p`, `audio-only` |
-| `--format-type` | | `auto` | Output container: `mp4`, `mkv`, `mp3`, `m4a` |
+| `--format-type` | | `auto` | Output container: `mp4`, `mkv`, `webm`, `mov`, `avi`, `flv`, `mp3`, `m4a`, `opus`, `wav` |
 | `--output-dir` | `-o` | *config value* | Custom output directory |
 | `--no-playlist` | `-n` | `false` | Download only single video, not playlist |
 | `--audio-only` | `-a` | `false` | Extract audio only (overrides `--quality`) |
@@ -131,6 +131,36 @@ Fetching info for: https://youtu.be/dQw4w9WgXcQ
 | `Platform` | Source platform (youtube, instagram, etc.) |
 | `Format` | Default format string |
 | `Formats avail` | Number of available formats |
+
+## search
+
+Search YouTube and download from the results interactively.
+
+```bash
+neodlp search <query>
+```
+
+Select from search results using `↑`/`↓` to navigate, `Space` to toggle, `Enter` to
+confirm, `Esc` to cancel.
+
+### Flags
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--limit` | `-l` | `10` | Max search results |
+
+### Examples
+
+```bash
+# Search and pick from results
+neodlp search "never gonna give you up"
+
+# Limit to 5 results
+neodlp search -l 5 "lofi hip hop mix"
+
+# Multi-word query
+neodlp search "rick astley official music video"
+```
 
 ## config
 

@@ -33,6 +33,10 @@ var rootCmd = &cobra.Command{
 }
 
 var (
+	searchOpts struct {
+		limit int
+	}
+
 	downloadOpts struct {
 		quality    string
 		format     string
@@ -67,6 +71,14 @@ var configCmd = &cobra.Command{
 	RunE:  configRun,
 }
 
+var searchCmd = &cobra.Command{
+	Use:   "search <query>",
+	Short: "Search and download media",
+	Long:  "Search YouTube and other platforms. Select from results to download.",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  searchRun,
+}
+
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Show version information",
@@ -80,6 +92,7 @@ func init() {
 	cobra.EnableCommandSorting = false
 
 	rootCmd.AddCommand(downloadCmd)
+	rootCmd.AddCommand(searchCmd)
 	rootCmd.AddCommand(infoCmd)
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
@@ -90,12 +103,14 @@ func init() {
 
 	downloadCmd.Flags().BoolVarP(&downloadOpts.pickFormat, "format", "f", false, "interactively select output format and resolution")
 	downloadCmd.Flags().StringVarP(&downloadOpts.quality, "quality", "q", "", "video quality (best, 1080p, 720p, audio-only)")
-	downloadCmd.Flags().StringVarP(&downloadOpts.format, "format-type", "", "", "output container (mp4, mkv, mp3, m4a)")
+	downloadCmd.Flags().StringVarP(&downloadOpts.format, "format-type", "", "", "output container (mp4, mkv, mp3, m4a, webm, mov, avi, flv, opus, wav)")
 	downloadCmd.Flags().StringVarP(&downloadOpts.outputDir, "output-dir", "o", "", "custom output directory")
 	downloadCmd.Flags().BoolVarP(&downloadOpts.noPlaylist, "no-playlist", "n", false, "download only single video, not playlist")
 	downloadCmd.Flags().BoolVarP(&downloadOpts.audioOnly, "audio-only", "a", false, "extract audio only")
 	downloadCmd.Flags().StringVarP(&downloadOpts.rateLimit, "rate-limit", "r", "", "download rate limit (e.g. 10M)")
 	downloadCmd.Flags().StringVarP(&downloadOpts.proxy, "proxy", "p", "", "proxy URL")
+
+	searchCmd.Flags().IntVarP(&searchOpts.limit, "limit", "l", 10, "max search results")
 }
 
 func Execute() {
@@ -234,6 +249,61 @@ func infoRun(cmd *cobra.Command, args []string) error {
 	}
 	if len(info.Formats) > 0 {
 		fmt.Printf("  Formats avail: %d\n", len(info.Formats))
+	}
+
+	return nil
+}
+
+func searchRun(cmd *cobra.Command, args []string) error {
+	query := strings.Join(args, " ")
+	ctx := context.Background()
+
+	fmt.Println(banner.String())
+	fmt.Println()
+	fmt.Printf("Searching for: %s\n", query)
+	fmt.Println()
+
+	results, err := downloader.Search(ctx, query, searchOpts.limit)
+	if err != nil {
+		return friendlyError("search failed", err)
+	}
+
+	if len(results) == 0 {
+		return fmt.Errorf("no results found for: %s", query)
+	}
+
+	var entries []tui.SearchEntry
+	for _, r := range results {
+		entries = append(entries, tui.SearchEntry{
+			Title:    r.Title,
+			URL:      r.URL,
+			Uploader: r.Uploader,
+			Duration: r.Duration,
+			Views:    r.Views,
+			Platform: r.Platform,
+		})
+	}
+
+	selectedURL, err := tui.SelectSearchResult(query, entries)
+	if err != nil {
+		return friendlyError("search selection failed", err)
+	}
+
+	fmt.Printf("\nDownloading: %s\n\n", selectedURL)
+
+	outputDir := downloadOpts.outputDir
+	if err := downloader.EnsureOutputDir(outputDir); err != nil {
+		return friendlyError("failed to prepare output directory", err)
+	}
+
+	opts := downloader.Options{
+		OutputDir:  outputDir,
+		RateLimit:  downloadOpts.rateLimit,
+		Proxy:      downloadOpts.proxy,
+	}
+
+	if err := tui.Start(selectedURL, opts); err != nil {
+		return friendlyError("download failed", err)
 	}
 
 	return nil
