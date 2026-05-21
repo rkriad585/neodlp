@@ -110,6 +110,8 @@ func downloadRun(cmd *cobra.Command, args []string) error {
 		return friendlyError("failed to prepare output directory", err)
 	}
 
+	formatSet := cmd.Flags().Changed("format")
+
 	opts := downloader.Options{
 		Quality:    downloadOpts.quality,
 		Format:     downloadOpts.format,
@@ -121,6 +123,20 @@ func downloadRun(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, url := range args {
+		if formatSet {
+			ctx := context.Background()
+			info, err := downloader.Info(ctx, url)
+			if err != nil {
+				return friendlyError("failed to fetch available formats", err)
+			}
+
+			selected, err := tui.SelectFormat(info)
+			if err != nil {
+				return friendlyError("format selection failed", err)
+			}
+			opts.Quality = selected
+		}
+
 		if err := tui.Start(url, opts); err != nil {
 			return friendlyError("download failed", err)
 		}
