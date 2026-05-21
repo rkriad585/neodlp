@@ -1,133 +1,127 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 type Config struct {
-	OutputDir          string              `json:"output_dir"`
-	DefaultQuality     string              `json:"default_quality"`
-	FFmpegPath         string              `json:"ffmpeg_path"`
-	ConcurrentDownloads int                `json:"concurrent_downloads"`
-	Platforms          map[string]Platform `json:"platforms"`
+	Download DownloadConfig `toml:"download"`
+	Network  NetworkConfig  `toml:"network"`
 }
 
-type Platform struct {
-	Quality string `json:"quality"`
+type DownloadConfig struct {
+	OutputDir           string `toml:"output_dir"`
+	Quality             string `toml:"quality"`
+	Format              string `toml:"format"`
+	ConcurrentFragments int    `toml:"concurrent_fragments"`
+	RateLimit           string `toml:"rate_limit"`
+}
+
+type NetworkConfig struct {
+	Proxy              string `toml:"proxy"`
+	CookiesFromBrowser string `toml:"cookies_from_browser"`
 }
 
 func Default() *Config {
+	home, _ := os.UserHomeDir()
+	outputDir := filepath.Join(home, "Downloads", "Neodlp")
+
 	return &Config{
-		OutputDir:           "~/Downloads/Neodlp",
-		DefaultQuality:      "best",
-		FFmpegPath:          "",
-		ConcurrentDownloads: 3,
-		Platforms: map[string]Platform{
-			"youtube":   {Quality: "bestvideo+bestaudio"},
-			"instagram": {Quality: "best"},
-			"facebook":  {Quality: "best"},
-			"twitter":   {Quality: "best"},
+		Download: DownloadConfig{
+			OutputDir:           outputDir,
+			Quality:             "best",
+			Format:              "auto",
+			ConcurrentFragments: 5,
+			RateLimit:           "",
+		},
+		Network: NetworkConfig{
+			Proxy:              "",
+			CookiesFromBrowser: "",
 		},
 	}
 }
 
-func configDir() (string, error) {
+var configPathFn = func() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", fmt.Errorf("home dir: %w", err)
+		return "", fmt.Errorf("cannot get home dir: %w", err)
 	}
-	return filepath.Join(home, ".config", "neostore", "neodlp"), nil
+	return filepath.Join(home, ".config", "neostore", "neodlp", "config.toml"), nil
 }
 
-func ConfigPath() (string, error) {
-	dir, err := configDir()
+func Path() (string, error) {
+	return configPathFn()
+}
+
+func Dir() (string, error) {
+	cfgPath, err := Path()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "config.json"), nil
+	return filepath.Dir(cfgPath), nil
 }
 
 func Load() (*Config, error) {
-	path, err := ConfigPath()
+	cfgPath, err := Path()
 	if err != nil {
-		return Default(), nil
+		return nil, err
 	}
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(cfgPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			cfg := Default()
-			if saveErr := cfg.Save(); saveErr != nil {
-				return cfg, nil
+			def := Default()
+			if saveErr := def.Save(); saveErr != nil {
+				return nil, fmt.Errorf("failed to save default config: %w", saveErr)
 			}
-			return cfg, nil
+			return def, nil
 		}
-		return Default(), nil
+		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
 
 	var cfg Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return Default(), nil
+	if err := toml.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	if cfg.OutputDir == "" {
-		cfg.OutputDir = Default().OutputDir
+	if cfg.Download.OutputDir == "" {
+		cfg.Download.OutputDir = Default().Download.OutputDir
 	}
-	if cfg.DefaultQuality == "" {
-		cfg.DefaultQuality = Default().DefaultQuality
+	if cfg.Download.Quality == "" {
+		cfg.Download.Quality = "best"
 	}
-	if cfg.ConcurrentDownloads == 0 {
-		cfg.ConcurrentDownloads = Default().ConcurrentDownloads
+	if cfg.Download.Format == "" {
+		cfg.Download.Format = "auto"
 	}
-	if cfg.Platforms == nil {
-		cfg.Platforms = Default().Platforms
+	if cfg.Download.ConcurrentFragments == 0 {
+		cfg.Download.ConcurrentFragments = 5
 	}
 
 	return &cfg, nil
 }
 
 func (c *Config) Save() error {
-	path, err := ConfigPath()
+	dir, err := Dir()
 	if err != nil {
 		return err
 	}
-
-	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("mkdir config: %w", err)
+		return fmt.Errorf("failed to create config dir: %w", err)
 	}
 
-	data, err := json.MarshalIndent(c, "", "  ")
+	cfgPath, _ := Path()
+	data, err := toml.Marshal(c)
 	if err != nil {
-		return fmt.Errorf("marshal config: %w", err)
+		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0644); err != nil {
-		return fmt.Errorf("write config: %w", err)
+	if err := os.WriteFile(cfgPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
 	}
 
 	return nil
-}
-
-func (c *Config) Set(key, value string) error {
-	switch key {
-	case "output_dir":
-		c.OutputDir = value
-	case "default_quality":
-		c.DefaultQuality = value
-	case "ffmpeg_path":
-		c.FFmpegPath = value
-	case "concurrent_downloads":
-		var n int
-		if _, err := fmt.Sscanf(value, "%d", &n); err != nil {
-			return fmt.Errorf("invalid number: %w", err)
-		}
-		c.ConcurrentDownloads = n
-	default:
-		return fmt.Errorf("unknown config key: %s", key)
-	}
-	return c.Save()
 }

@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+
+      - name: Set variables
+        id: vars
+        run: |
+          echo "version=$(cat .version)" >> $GITHUB_OUTPUT
+          echo "commit=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build Linux amd64
+        run: |
+          GOOS=linux GOARCH=amd64 go build -ldflags="-X neodlp/internal/version.Commit=${{ steps.vars.outputs.commit }}" -o dist/neodlp-linux-amd64 .
+
+      - name: Build Linux arm64
+        run: |
+          GOOS=linux GOARCH=arm64 go build -ldflags="-X neodlp/internal/version.Commit=${{ steps.vars.outputs.commit }}" -o dist/neodlp-linux-arm64 .
+
+      - name: Build macOS amd64
+        run: |
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-X neodlp/internal/version.Commit=${{ steps.vars.outputs.commit }}" -o dist/neodlp-darwin-amd64 .
+
+      - name: Build macOS arm64
+        run: |
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-X neodlp/internal/version.Commit=${{ steps.vars.outputs.commit }}" -o dist/neodlp-darwin-arm64 .
+
+      - name: Build Windows amd64
+        run: |
+          GOOS=windows GOARCH=amd64 go build -ldflags="-X neodlp/internal/version.Commit=${{ steps.vars.outputs.commit }}" -o dist/neodlp-windows-amd64.exe .
+
+      - name: Checksum
+        working-directory: dist
+        run: sha256sum * > checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "v${{ steps.vars.outputs.version }}"
+          tag_name: "v${{ steps.vars.outputs.version }}"
+          body: |
+            ## NeoDLP ${{ steps.vars.outputs.version }}
+
+            See [CHANGELOG](./CHANGELOG.md) for details.
+          files: dist/*
