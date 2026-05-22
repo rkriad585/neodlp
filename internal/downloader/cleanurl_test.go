@@ -23,7 +23,7 @@ func TestSanitizeURL(t *testing.T) {
 		},
 		{
 			"https://www.threads.com/@theshakibkhan/post/DYj6_WzgrXC?xmt=AQG0UXOhCOU2DxI-uuhuDq_htJzaq_ZLons2VKRVjAcwxg",
-			"https://www.threads.com/@theshakibkhan/post/DYj6_WzgrXC",
+			"https://www.threads.net/@theshakibkhan/post/DYj6_WzgrXC",
 		},
 		{
 			"https://example.com/video?ref=share&source=web",
@@ -36,6 +36,18 @@ func TestSanitizeURL(t *testing.T) {
 		{
 			"https://example.com?keep=this&utm_source=bad&fbclid=123",
 			"https://example.com?keep=this",
+		},
+		{
+			"https://www.threads.com/@theshakibkhan/post/DYj6_WzgrXC",
+			"https://www.threads.net/@theshakibkhan/post/DYj6_WzgrXC",
+		},
+		{
+			"https://threads.com/@user/post/abc",
+			"https://threads.net/@user/post/abc",
+		},
+		{
+			"https://www.threads.com/@user/post/abc?xmt=tracking",
+			"https://www.threads.net/@user/post/abc",
 		},
 	}
 

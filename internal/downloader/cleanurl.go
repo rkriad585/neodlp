@@ -25,6 +25,11 @@ var trackingParams = map[string]bool{
 	"mc_eid":       true,
 }
 
+var domainRewrites = map[string]string{
+	"threads.com": "threads.net",
+	"www.threads.com": "www.threads.net",
+}
+
 func SanitizeURL(rawURL string) string {
 	u, err := url.Parse(rawURL)
 	if err != nil {
@@ -37,8 +42,11 @@ func SanitizeURL(rawURL string) string {
 			q.Del(key)
 		}
 	}
-
 	u.RawQuery = q.Encode()
+
+	if replacement, ok := domainRewrites[strings.ToLower(u.Host)]; ok {
+		u.Host = replacement
+	}
 
 	cleaned := u.String()
 	if cleaned != rawURL {

@@ -196,6 +196,8 @@ func friendlyError(msg string, err error) error {
 		msgs = append(msgs, "This video is private.")
 	case strings.Contains(errStr, "download cancelled"):
 		msgs = append(msgs, "Download was cancelled by the user.")
+	case strings.Contains(errStr, "threads"):
+		msgs = append(msgs, "Threads support may require a newer yt-dlp version. Run 'neodlp download' to auto-update yt-dlp.")
 	case strings.Contains(errStr, "Unsupported URL"):
 		msgs = append(msgs, "This URL is not supported by yt-dlp. Check that the platform is supported and the URL is correct.")
 	case strings.Contains(errStr, "Unsupported site"):
