@@ -1,26 +1,21 @@
 package version
 
-import (
-	_ "embed"
-	"strings"
+var (
+	Version        = "v0.1.0"
+	Commit         = "unknown"
+	PublisherName  = "rkriad585"
+	PublisherEmail = "rkriad585@gmail.com"
 )
 
-//go:embed .version
-var versionFile string
-
-var Commit = "dev"
-
-func Version() string {
-	return strings.TrimSpace(versionFile)
-}
-
-func FullVersion() string {
-	return Version() + " (commit: " + Commit + ")"
-}
-
-func CommitShort() string {
-	if len(Commit) > 7 {
-		return Commit[:7]
+func init() {
+	if Commit == "" {
+		Commit = "unknown"
 	}
-	return Commit
+}
+
+func String() string {
+	if Commit != "unknown" {
+		return Version + " (" + Commit + ")"
+	}
+	return Version
 }

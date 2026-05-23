@@ -55,14 +55,18 @@ Tiny entry point. Calls `cmd.Execute()`.
 
 ### `cmd/root.go`
 
-Cobra command definitions. Four subcommands:
+Cobra command definitions. Six subcommands and persistent flags:
 
-| Command | Alias | Description |
-|---------|-------|-------------|
+| Command / Flag | Alias | Description |
+|----------------|-------|-------------|
 | `download` | `dl` | Download media with TUI |
+| `search` | — | Search YouTube and download interactively |
 | `info` | — | Show metadata |
 | `config` | — | Manage config |
 | `version` | — | Show version |
+| `update` | — | Update yt-dlp binary |
+| `self-update` | — | Update neodlp binary itself from GitHub |
+| `--selfuninstall` | — | Persistent flag to completely uninstall neodlp from the system |
 
 The `downloadRun` function:
 1. Ensures the output directory exists

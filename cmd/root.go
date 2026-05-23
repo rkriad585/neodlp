@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lrstanley/go-ytdlp"
 	"github.com/spf13/cobra"
 
 	"neodlp/internal/banner"
@@ -18,10 +19,18 @@ import (
 	"neodlp/internal/tui"
 )
 
+var selfUninstallFlag bool
+
 var rootCmd = &cobra.Command{
 	Use:   "neodlp",
 	Short: "NeoDLP - Universal media downloader",
 	Long:  `NeoDLP downloads video, audio, and media from YouTube, Instagram, Facebook, X, TikTok, and more.`,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if selfUninstallFlag {
+			os.Exit(selfUninstall())
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			return cmd.Help()
@@ -38,14 +47,18 @@ var (
 	}
 
 	downloadOpts struct {
-		quality    string
-		format     string
-		outputDir  string
-		noPlaylist bool
-		audioOnly  bool
-		rateLimit  string
-		proxy      string
-		pickFormat bool
+		quality        string
+		format         string
+		outputDir      string
+		noPlaylist     bool
+		audioOnly      bool
+		rateLimit      string
+		proxy          string
+		pickFormat     bool
+		fromFile       string
+		writeThumbnail bool
+		writeSubs      string
+		writeAutoSubs  bool
 	}
 )
 
@@ -53,7 +66,7 @@ var downloadCmd = &cobra.Command{
 	Use:     "download [url...]",
 	Aliases: []string{"dl"},
 	Short:   "Download media from URL(s)",
-	Args:    cobra.MinimumNArgs(1),
+	Args:    cobra.ArbitraryArgs,
 	RunE:    downloadRun,
 }
 
@@ -88,6 +101,13 @@ var versionCmd = &cobra.Command{
 	},
 }
 
+var updateCmd = &cobra.Command{
+	Use:   "update",
+	Short: "Update yt-dlp to the latest version",
+	Long:  "Clears the cached yt-dlp binary and downloads the latest version from GitHub.",
+	RunE:  updateRun,
+}
+
 func init() {
 	cobra.EnableCommandSorting = false
 
@@ -96,6 +116,7 @@ func init() {
 	rootCmd.AddCommand(infoCmd)
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(updateCmd)
 
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 	rootCmd.Flags().SortFlags = false
@@ -109,8 +130,16 @@ func init() {
 	downloadCmd.Flags().BoolVarP(&downloadOpts.audioOnly, "audio-only", "a", false, "extract audio only")
 	downloadCmd.Flags().StringVarP(&downloadOpts.rateLimit, "rate-limit", "r", "", "download rate limit (e.g. 10M)")
 	downloadCmd.Flags().StringVarP(&downloadOpts.proxy, "proxy", "p", "", "proxy URL")
+	downloadCmd.Flags().StringVarP(&downloadOpts.fromFile, "from-file", "", "", "read URLs from a file (one per line)")
+	downloadCmd.Flags().BoolVarP(&downloadOpts.writeThumbnail, "write-thumbnail", "", false, "write thumbnail image and embed it")
+	downloadCmd.Flags().StringVarP(&downloadOpts.writeSubs, "write-subs", "", "", "write subtitles for given language(s) (e.g. en,es)")
+	downloadCmd.Flags().BoolVarP(&downloadOpts.writeAutoSubs, "write-auto-subs", "", false, "write auto-generated subtitles")
 
 	searchCmd.Flags().IntVarP(&searchOpts.limit, "limit", "l", 10, "max search results")
+
+	updateCmd.Flags().StringP("proxy", "p", "", "proxy URL for downloading yt-dlp")
+
+	rootCmd.PersistentFlags().BoolVar(&selfUninstallFlag, "selfuninstall", false, "Uninstall neodlp from the system")
 }
 
 func Execute() {
@@ -123,6 +152,18 @@ func Execute() {
 func downloadRun(cmd *cobra.Command, args []string) error {
 	outputDir := downloadOpts.outputDir
 
+	if downloadOpts.fromFile != "" {
+		fileURLs, err := downloader.ReadURLsFromFile(downloadOpts.fromFile)
+		if err != nil {
+			return friendlyError("failed to read URL file", err)
+		}
+		args = append(args, fileURLs...)
+	}
+
+	if len(args) == 0 {
+		return friendlyError("no URLs provided", fmt.Errorf("provide URLs as arguments or use --from-file"))
+	}
+
 	if err := downloader.EnsureOutputDir(outputDir); err != nil {
 		return friendlyError("failed to prepare output directory", err)
 	}
@@ -131,13 +172,16 @@ func downloadRun(cmd *cobra.Command, args []string) error {
 	containerFmt := downloadOpts.format
 
 	opts := downloader.Options{
-		Quality:    downloadOpts.quality,
-		Format:     containerFmt,
-		OutputDir:  outputDir,
-		NoPlaylist: downloadOpts.noPlaylist,
-		AudioOnly:  downloadOpts.audioOnly,
-		RateLimit:  downloadOpts.rateLimit,
-		Proxy:      downloadOpts.proxy,
+		Quality:        downloadOpts.quality,
+		Format:         containerFmt,
+		OutputDir:      outputDir,
+		NoPlaylist:     downloadOpts.noPlaylist,
+		AudioOnly:      downloadOpts.audioOnly,
+		RateLimit:      downloadOpts.rateLimit,
+		Proxy:          downloadOpts.proxy,
+		WriteThumbnail: downloadOpts.writeThumbnail,
+		WriteSubs:      downloadOpts.writeSubs,
+		WriteAutoSubs:  downloadOpts.writeAutoSubs,
 	}
 
 	for _, rawURL := range args {
@@ -183,7 +227,7 @@ func friendlyError(msg string, err error) error {
 
 	switch {
 	case strings.Contains(errStr, "yt-dlp") && strings.Contains(errStr, "not found"):
-		msgs = append(msgs, "yt-dlp binary not found. Run 'neodlp download' again to auto-install it.")
+		msgs = append(msgs, "yt-dlp binary not found. Run 'neodlp update' to retry the download (it will retry 3 times with extended timeouts).")
 	case strings.Contains(errStr, "HTTP Error 403"):
 		msgs = append(msgs, "Access denied (403). The video may be private or region-locked.")
 	case strings.Contains(errStr, "HTTP Error 404"):
@@ -196,6 +240,8 @@ func friendlyError(msg string, err error) error {
 		msgs = append(msgs, "This video is private.")
 	case strings.Contains(errStr, "download cancelled"):
 		msgs = append(msgs, "Download was cancelled by the user.")
+	case strings.Contains(errStr, "deadline") || strings.Contains(errStr, "Client.Timeout"):
+		msgs = append(msgs, "yt-dlp download timed out. If you are behind a proxy, set 'network.proxy' in the config file.")
 	case strings.Contains(errStr, "threads"):
 		msgs = append(msgs, "Threads support may require a newer yt-dlp version. Run 'neodlp download' to auto-update yt-dlp.")
 	case strings.Contains(errStr, "Unsupported URL"):
@@ -455,4 +501,68 @@ func configFlatten(cfg *config.Config) map[string]string {
 		"network.proxy":                 cfg.Network.Proxy,
 		"network.cookies_from_browser":  cfg.Network.CookiesFromBrowser,
 	}
+}
+
+func updateRun(cmd *cobra.Command, args []string) error {
+	fmt.Println(banner.String())
+	fmt.Println()
+	fmt.Println("Updating yt-dlp to the latest version...")
+	fmt.Println()
+
+	// Apply proxy from config or --update-proxy flag
+	var proxyURL string
+	if p, _ := cmd.Flags().GetString("proxy"); p != "" {
+		proxyURL = p
+	} else {
+		cfg, err := config.Load()
+		if err == nil {
+			proxyURL = cfg.Network.Proxy
+		}
+	}
+	if proxyURL != "" {
+		fmt.Printf("  Using proxy: %s\n", proxyURL)
+		os.Setenv("HTTP_PROXY", proxyURL)
+		os.Setenv("HTTPS_PROXY", proxyURL)
+	}
+
+	if err := ytdlp.RemoveInstallCache(); err != nil {
+		return friendlyError("failed to clear yt-dlp cache", err)
+	}
+
+	const maxRetries = 3
+	var lastErr error
+	for i := 0; i < maxRetries; i++ {
+		fmt.Printf("  Attempt %d/%d", i+1, maxRetries)
+		if maxRetries > 1 {
+			fmt.Print("...")
+		}
+		fmt.Println()
+
+		installCtx, cancel := context.WithTimeout(cmd.Context(), 5*time.Minute)
+		resolved, err := ytdlp.Install(installCtx, nil)
+		cancel()
+		if err == nil {
+			fmt.Printf("  ✓ yt-dlp updated to %s\n", resolved.Version)
+			fmt.Printf("  Location: %s\n", resolved.Executable)
+			return nil
+		}
+		lastErr = err
+		if isRetryableNetError(err) && i < maxRetries-1 {
+			fmt.Printf("  ✗ download failed (timeout), retrying in %ds...\n", (i+1)*3)
+			time.Sleep(time.Duration(i+1) * 3 * time.Second)
+			continue
+		}
+		return friendlyError("update failed", err)
+	}
+	return friendlyError("update failed", lastErr)
+}
+
+func isRetryableNetError(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "timeout") ||
+		strings.Contains(msg, "deadline exceeded") ||
+		strings.Contains(msg, "Client.Timeout") ||
+		strings.Contains(msg, "connection") ||
+		strings.Contains(msg, "reset") ||
+		strings.Contains(msg, "EOF")
 }

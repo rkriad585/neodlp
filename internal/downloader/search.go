@@ -3,8 +3,10 @@ package downloader
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/lrstanley/go-ytdlp"
+	"neodlp/internal/config"
 )
 
 type SearchResult struct {
@@ -22,16 +24,32 @@ func Search(ctx context.Context, query string, limit int) ([]SearchResult, error
 		limit = 10
 	}
 
+	cfg, err := config.Load()
+	var proxy string
+	if err == nil && cfg != nil {
+		proxy = cfg.Network.Proxy
+	}
+
+	if proxy != "" {
+		os.Setenv("HTTP_PROXY", proxy)
+		os.Setenv("HTTPS_PROXY", proxy)
+	}
+
 	ytdlp.Install(ctx, nil)
 
 	searchQuery := fmt.Sprintf("ytsearch%d:%s", limit, query)
 
-	result, err := ytdlp.New().
+	cmd := ytdlp.New().
 		DumpJSON().
 		FlatPlaylist().
 		Quiet().
-		NoWarnings().
-		Run(ctx, searchQuery)
+		NoWarnings()
+
+	if proxy != "" {
+		cmd = cmd.Proxy(proxy)
+	}
+
+	result, err := cmd.Run(ctx, searchQuery)
 	if err != nil {
 		return nil, fmt.Errorf("search failed: %w", err)
 	}

@@ -2,50 +2,49 @@ package banner
 
 import (
 	"fmt"
-	"math/rand"
 	"strings"
+	"unicode/utf8"
 
-	"github.com/rkriad585/neodlp/internal/version"
+	"neodlp/internal/version"
 )
 
-var tips = []string{
-	"Use -o to set custom output folder",
-	"Pass multiple URLs to batch download",
-	"Use -f urls.txt to download from a file",
-	"Use --quality to override quality settings",
-	"Use neodlp info <url> to preview media",
-}
+const width = 56
 
-var commands = []string{
-	"neodlp dl <url>",
-	"neodlp dl <url1> <url2> <url3>",
-	"neodlp dl -f urls.txt",
-	"neodlp info <url>",
-	"neodlp config",
-	"neodlp version",
-}
-
-func Build(noBanner bool) string {
-	if noBanner {
-		return ""
+func padRight(s string, n int) string {
+	w := utf8.RuneCountInString(s)
+	if w >= n {
+		return s
 	}
+	return s + strings.Repeat(" ", n-w)
+}
 
-	tip := tips[rand.Intn(len(tips))]
-	cmd := commands[rand.Intn(len(commands))]
+func line(parts ...string) string {
+	inner := strings.Join(parts, "")
+	return "│" + padRight(inner, width-2) + "│"
+}
 
-	ver := version.Version()
-	commit := version.CommitShort()
+func String() string {
+	v := version.Version
+	c := version.Commit
+
+	titlePad := width - 2 - utf8.RuneCountInString(" neodlp ")
+	left := titlePad / 2
+	right := titlePad - left
+
+	top := "╭" + strings.Repeat("─", left) + " neodlp " + strings.Repeat("─", right) + "╮"
+	bot := "╰" + strings.Repeat("─", width-2) + "╯"
 
 	lines := []string{
-		fmt.Sprintf("╭──────────────── neodlp ───────────────────╮"),
-		fmt.Sprintf("│      Author : RK Riad Khan                │"),
-		fmt.Sprintf("│      Version: %-39s│", ver),
-		fmt.Sprintf("│      Commit : %-39s│", commit),
-		fmt.Sprintf("│      GitHub : rkriad585/neodlp            │"),
-		fmt.Sprintf("│      [TIP]: %-38s│", tip),
-		fmt.Sprintf("│      %-42s│", cmd),
-		fmt.Sprintf("╰───────────────────────────────────────────╯"),
+		top,
+		line("      Author : RK Riad Khan"),
+		line("      Version: " + v),
+		line("      Commit : " + c),
+		line("      GitHub : rkriad585/neodlp"),
+		bot,
 	}
-
 	return strings.Join(lines, "\n")
+}
+
+func Print() {
+	fmt.Println(String())
 }

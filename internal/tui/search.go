@@ -55,15 +55,17 @@ func SelectSearchResult(query string, results []SearchEntry) (string, error) {
 	var items []searchItem
 	for _, r := range results {
 		title := r.Title
-		if len(title) > 55 {
-			title = title[:52] + "..."
+		tRunes := []rune(title)
+		if len(tRunes) > 55 {
+			title = string(tRunes[:52]) + "..."
 		}
 
 		var parts []string
 		if r.Uploader != "" {
 			uploader := r.Uploader
-			if len(uploader) > 18 {
-				uploader = uploader[:15] + "..."
+			uRunes := []rune(uploader)
+			if len(uRunes) > 18 {
+				uploader = string(uRunes[:15]) + "..."
 			}
 			parts = append(parts, uploader)
 		}

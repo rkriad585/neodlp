@@ -32,9 +32,23 @@ Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp) under the hood. Built with
 
 ## Installation
 
+### Automatic remote installation
+
+You can install `neodlp` instantly on your system globally using the following one-liners:
+
+* **Windows (PowerShell)**:
+  ```powershell
+  irm https://raw.githubusercontent.com/rkriad585/neodlp/main/install.ps1 | iex
+  ```
+
+* **Linux / macOS (Bash)**:
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/rkriad585/neodlp/main/installer.sh | sh
+  ```
+
 ### Pre-built binaries
 
-Download the latest release for your platform from the [Releases page](https://github.com/rkriad585/neodlp/releases).
+Alternatively, download the latest compiled binary for your specific platform and architecture from the [Releases page](https://github.com/rkriad585/neodlp/releases).
 
 ### Build from source
 
@@ -53,6 +67,7 @@ On Windows:
 ### Dependencies
 
 NeoDLP auto-downloads the `yt-dlp` binary on first run — no manual installation required.
+
 
 ---
 
@@ -127,7 +142,36 @@ neodlp config edit
 neodlp version
 ```
 
+### Self-update
+
+```bash
+# Update neodlp binary itself to the latest version automatically
+neodlp self-update
+```
+
+### Self-uninstall
+
+To completely uninstall `neodlp`, remove all its files, config directories, and the binary from your system instantly:
+
+```bash
+# Call the self-uninstall flag directly on the executable
+neodlp --selfuninstall
+```
+
+Alternatively, you can run the remote uninstaller script directly:
+
+* **Windows (PowerShell)**:
+  ```powershell
+  Invoke-RestMethod -Uri "https://raw.githubusercontent.com/rkriad585/neodlp/main/installer.ps1" | Invoke-Expression -ArgumentList "--selfuninstall"
+  ```
+
+* **Linux / macOS (Bash)**:
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/rkriad585/neodlp/main/installer.sh | sh -s -- --selfuninstall
+  ```
+
 ---
+
 
 ## Configuration
 

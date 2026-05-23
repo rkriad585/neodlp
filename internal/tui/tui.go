@@ -270,8 +270,9 @@ func (m model) View() string {
 
 		if prog.Filename != "" {
 			fn := prog.Filename
-			if len(fn) > boxWidth-20 {
-				fn = "..." + fn[len(fn)-boxWidth+23:]
+			fnRunes := []rune(fn)
+			if len(fnRunes) > boxWidth-20 {
+				fn = "..." + string(fnRunes[len(fnRunes)-boxWidth+23:])
 			}
 			info = append(info, [2]string{"File", fn})
 		}

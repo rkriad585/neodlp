@@ -194,3 +194,41 @@ neodlp version
 ```
 
 Output includes the ASCII banner with version and git commit hash.
+
+## update
+
+Update yt-dlp to the latest version. Clears the cached binary and downloads the latest release from GitHub.
+
+```bash
+neodlp update
+```
+
+Useful if you encounter "Unsupported URL" errors that require a newer yt-dlp version.
+
+## self-update
+
+Self update neodlp to the latest version. Fetches the latest version info from GitHub and updates the neodlp binary if a new version is available.
+
+```bash
+neodlp self-update [flags]
+```
+
+### Flags
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--proxy` | `-p` | *none* | Proxy URL for downloading the update |
+
+## --selfuninstall (Flag)
+
+Uninstall neodlp cleanly from the system. This flag is persistent and can be passed on any command or directly on the root.
+
+```bash
+neodlp --selfuninstall
+```
+
+It removes:
+- The `config.toml` file and configuration directory (`~/.config/neostore/neodlp`).
+- The `neodlp` binary itself.
+- (For Windows, it schedules a deferred self-deleting batch script `neodlp-uninstall.bat` in the Temp directory to delete the locked running binary after exit).
+

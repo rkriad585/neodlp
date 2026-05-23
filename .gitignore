@@ -1,24 +1,15 @@
 # Binaries
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
 neodlp
 neodlp.exe
-
-# Test binary
+*.exe
 *.test
-
-# Output
-/out/
+*.out
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
-*~
 
 # OS
 .DS_Store
@@ -27,5 +18,6 @@ Thumbs.db
 # Dependencies
 vendor/
 
-# Build
-/tmp/
+# Build artifacts
+dist/
+bin/

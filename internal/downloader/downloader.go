@@ -10,6 +10,7 @@ import (
 
 	"github.com/lrstanley/go-ytdlp"
 	"neodlp/internal/config"
+	"neodlp/internal/downloader/extractor"
 )
 
 type Result struct {
@@ -20,13 +21,16 @@ type Result struct {
 }
 
 type Options struct {
-	Quality    string
-	Format     string
-	OutputDir  string
-	NoPlaylist bool
-	AudioOnly  bool
-	RateLimit  string
-	Proxy      string
+	Quality        string
+	Format         string
+	OutputDir      string
+	NoPlaylist     bool
+	AudioOnly      bool
+	RateLimit      string
+	Proxy          string
+	WriteThumbnail bool
+	WriteSubs      string
+	WriteAutoSubs  bool
 }
 
 func resolveOpts(opts Options) (*config.Config, string, string, string, error) {
@@ -62,14 +66,30 @@ func applyOpts(dl *ytdlp.Command, opts Options, cfg *config.Config, quality, out
 		dl = dl.ExtractAudio().
 			AudioFormat("mp3").
 			AudioQuality("0")
-	} else if outFmt != "auto" {
-		dl = dl.FormatSort(fmt.Sprintf("res,ext:%s:m4a", outFmt)).
-			RecodeVideo(outFmt)
-	} else if quality != "" && quality != "best" {
-		height := strings.TrimSuffix(quality, "p")
-		dl = dl.Format(fmt.Sprintf("bestvideo[height<=%s]+bestaudio/best[height<=%s]", height, height))
 	} else {
-		dl = dl.FormatSort("res,ext:mp4:m4a")
+		if quality != "" && quality != "best" {
+			height := strings.TrimSuffix(quality, "p")
+			dl = dl.Format(fmt.Sprintf("bestvideo[height<=%s]+bestaudio/best[height<=%s]", height, height))
+		}
+
+		if outFmt != "auto" {
+			dl = dl.FormatSort(fmt.Sprintf("res,ext:%s:m4a", outFmt)).
+				RecodeVideo(outFmt)
+		} else {
+			dl = dl.FormatSort("res,ext:mp4:m4a")
+		}
+	}
+
+	if opts.WriteThumbnail {
+		dl = dl.WriteThumbnail().EmbedThumbnail()
+	}
+
+	if opts.WriteSubs != "" {
+		dl = dl.WriteSubs().SubLangs(opts.WriteSubs)
+	}
+
+	if opts.WriteAutoSubs {
+		dl = dl.WriteAutoSubs()
 	}
 
 	if opts.RateLimit != "" {
@@ -109,7 +129,18 @@ func download(ctx context.Context, urls []string, opts Options, progressFn ytdlp
 		return nil, err
 	}
 
-	ytdlp.Install(ctx, nil)
+	proxy := opts.Proxy
+	if proxy == "" {
+		proxy = cfg.Network.Proxy
+	}
+	if proxy != "" {
+		os.Setenv("HTTP_PROXY", proxy)
+		os.Setenv("HTTPS_PROXY", proxy)
+	}
+
+	if _, installErr := ytdlp.Install(ctx, nil); installErr != nil {
+		fmt.Fprintf(os.Stderr, "  ! yt-dlp not available (%v); will try native fallback\n", installErr)
+	}
 
 	var results []Result
 
@@ -127,6 +158,16 @@ func download(ctx context.Context, urls []string, opts Options, progressFn ytdlp
 		dl = applyOpts(dl, opts, cfg, quality, outFmt)
 
 		if _, err := dl.Run(ctx, url); err != nil {
+			if extractor.ShouldFallback(err) {
+				if fbErr := downloadWithFallback(ctx, url, opts); fbErr != nil {
+					return nil, fmt.Errorf("yt-dlp: %w; native fallback: %v", err, fbErr)
+				}
+				results = append(results, Result{
+					URL:      url,
+					Platform: extractPlatform(url),
+				})
+				continue
+			}
 			return nil, fmt.Errorf("failed to download %s: %w", url, err)
 		}
 
@@ -141,26 +182,23 @@ func download(ctx context.Context, urls []string, opts Options, progressFn ytdlp
 }
 
 func Info(ctx context.Context, url string) (*ytdlp.ExtractedInfo, error) {
-	ytdlp.Install(ctx, nil)
+	return InfoWithFallback(ctx, url)
+}
 
-	result, err := ytdlp.New().
-		DumpJSON().
-		Quiet().
-		NoWarnings().
-		Run(ctx, url)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get info: %w", err)
-	}
+func InfoWithFallback(ctx context.Context, url string) (*ytdlp.ExtractedInfo, error) {
+	return extractor.InfoWithFallback(ctx, url)
+}
 
-	info, err := result.GetExtractedInfo()
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse info: %w", err)
+func downloadWithFallback(ctx context.Context, url string, opts Options) error {
+	outputDir := opts.OutputDir
+	if outputDir == "" {
+		cfg, err := config.Load()
+		if err != nil {
+			return err
+		}
+		outputDir = cfg.Download.OutputDir
 	}
-
-	if len(info) > 0 {
-		return info[0], nil
-	}
-	return nil, fmt.Errorf("no info returned")
+	return extractor.DownloadWithFallback(ctx, url, outputDir, false)
 }
 
 func extractPlatform(url string) string {
@@ -230,4 +268,26 @@ func EnsureOutputDir(path string) error {
 		return err
 	}
 	return os.MkdirAll(abs, 0755)
+}
+
+func ReadURLsFromFile(path string) ([]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading URL file: %w", err)
+	}
+
+	var urls []string
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		urls = append(urls, line)
+	}
+
+	if len(urls) == 0 {
+		return nil, fmt.Errorf("no URLs found in %s", path)
+	}
+
+	return urls, nil
 }
