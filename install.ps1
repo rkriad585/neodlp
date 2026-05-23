@@ -142,9 +142,15 @@ try {
 }
 
 # 3.1 Download yt-dlp dependency
-$ytdlpUrl = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.03.17/yt-dlp.exe"
+$ytdlpAsset = "yt-dlp.exe"
+if ($arch -eq "arm64") {
+    $ytdlpAsset = "yt-dlp_arm64.exe"
+} elseif ($arch -eq "386") {
+    $ytdlpAsset = "yt-dlp_x86.exe"
+}
+$ytdlpUrl = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.03.17/$ytdlpAsset"
 $ytdlpPath = Join-Path $BinDir "yt-dlp.exe"
-Write-Host "  Downloading yt-dlp dependency from $ytdlpUrl ...`n"
+Write-Host "  Downloading yt-dlp dependency ($ytdlpAsset) from $ytdlpUrl ...`n"
 try {
     $oldProgressPreference = $ProgressPreference
     $ProgressPreference = 'SilentlyContinue'

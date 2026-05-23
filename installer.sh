@@ -172,7 +172,7 @@ echo -e "  ${GREEN}✓ Successfully downloaded ${PROJECT_NAME} (${SIZE})${NC}"
 case "${OS}" in
     linux)
         if [ "${ARCH}" = "amd64" ]; then
-            YTDLP_ASSET="yt-dlp"
+            YTDLP_ASSET="yt-dlp_linux"
         else
             YTDLP_ASSET="yt-dlp_linux_aarch64"
         fi
