@@ -53,29 +53,22 @@ together.
 
 Tiny entry point. Calls `cmd.Execute()`.
 
-### `cmd/root.go`
+### `cmd/`
 
-Cobra command definitions. Six subcommands and persistent flags:
+This package houses subcommands:
 
-| Command / Flag | Alias | Description |
-|----------------|-------|-------------|
-| `download` | `dl` | Download media with TUI |
-| `search` | — | Search YouTube and download interactively |
-| `info` | — | Show metadata |
-| `config` | — | Manage config |
-| `version` | — | Show version |
-| `update` | — | Update yt-dlp binary |
-| `self-update` | — | Update neodlp binary itself from GitHub |
-| `--selfuninstall` | — | Persistent flag to completely uninstall neodlp from the system |
+- `root.go`: Standard root command, flags, and `download` / `dl` subcommand execution.
+- `serve.go`: Start the local HTTP REST API daemon daemonizing queue operations.
+- `watch.go`: Start the folder/file watcher suite.
+- `self_update.go`: Command to auto-update the binary from GitHub.
+- `uninstall.go`: Uninstallation utility flags.
 
 The `downloadRun` function:
 1. Ensures the output directory exists
 2. Resolves CLI flags into `downloader.Options`
-3. Launches the BubbleTea TUI (`tui.Start(url, opts)`) for each URL
-
-The `infoRun` function:
-1. Calls `downloader.Info()` with the URL
-2. Prints formatted metadata to stdout
+3. Checks URL arguments count:
+   - **Single URL**: Launches the classic TUI (`tui.Start(url, opts)`)
+   - **Multiple URLs**: Launches the parallel dashboard (`tui.StartMulti(urls, opts, maxConcurrent)`)
 
 ### `internal/version/version.go`
 
@@ -113,13 +106,18 @@ Key types:
 
 ```go
 type Options struct {
-    Quality    string
-    Format     string
-    OutputDir  string
-    NoPlaylist bool
-    AudioOnly  bool
-    RateLimit  string
-    Proxy      string
+    Quality        string
+    Format         string
+    OutputDir      string
+    NoPlaylist     bool
+    AudioOnly      bool
+    RateLimit      string
+    Proxy          string
+    WriteThumbnail bool
+    WriteSubs      string
+    WriteAutoSubs  bool
+    EmbedMetadata  bool
+    UploadTarget   string
 }
 
 type Result struct {
@@ -135,39 +133,31 @@ type Result struct {
 2. Config file value
 3. Default value (lowest priority)
 
-### `internal/tui/tui.go`
+### `internal/queue/`
 
-BubbleTea TUI with real-time download progress.
+Orchestrates concurrent downloads:
+- Bounded workers execute downloads using goroutines.
+- Communicates updates via progress channels to BubbleTea dashboards or REST API responses.
 
-**Message types:**
+### `internal/uploader/`
 
-| Type | Trigger | Content |
-|------|---------|---------|
-| `readyMsg` | Init | Signals model to start download |
-| `progressMsg` | Every 100ms | `ytdlp.ProgressUpdate` from the download |
-| `finishedMsg` | Download end | `nil` or error |
+Contains cloud sync providers:
+- **Telegram bot uploader**: Uploads files directly as documents using form requests.
+- **Discord webhook uploader**: Pushes attachments to channel webhooks.
+- **Custom command uploader**: Spawns shell processes replacing `%file%` placeholders.
 
-**Model state:**
+### `internal/tui/`
 
-| Field | Purpose |
-|-------|---------|
-| `url` | Download URL (displayed) |
-| `spinner` | Animated spinner (Bubbles) |
-| `progress` | Gradient progress bar (Bubbles) |
-| `prog` | Latest `ProgressUpdate` |
-| `status` | Current status text |
-| `err` | Error if download failed |
-| `done` | Download complete |
-| `started` | Start timestamp for elapsed time |
+BubbleTea TUI components. Renders either the single-URL layout (`tui.go`) or the parallel multi-item dashboard queue view (`multi.go`).
 
-**Architecture pattern:**
+**TUI Architecture pattern:**
 
 ```
 Update() receives readyMsg
-  └─▶ returns launchDownload() as tea.Cmd
-       └─▶ goroutine calls downloader.DownloadWithProgress()
-            └─▶ progress callback calls Program.Send(progressMsg{...})
-                 └─▶ Update() updates model state → View() re-renders
+  └─▶ starts queue.Run() worker pool
+       └─▶ workers invoke downloader.DownloadWithProgress()
+            └─▶ progress callback dispatches Program.Send(multiProgressMsg)
+                 └─▶ Update() updates UI row metrics → View() re-renders
 ```
 
 ## Data flow: download

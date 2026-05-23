@@ -11,6 +11,7 @@ import (
 type Config struct {
 	Download DownloadConfig `toml:"download"`
 	Network  NetworkConfig  `toml:"network"`
+	Upload   UploadConfig   `toml:"upload"`
 }
 
 type DownloadConfig struct {
@@ -24,6 +25,25 @@ type DownloadConfig struct {
 type NetworkConfig struct {
 	Proxy              string `toml:"proxy"`
 	CookiesFromBrowser string `toml:"cookies_from_browser"`
+}
+
+type UploadConfig struct {
+	Telegram TelegramUploadConfig `toml:"telegram"`
+	Discord  DiscordUploadConfig  `toml:"discord"`
+	Custom   CustomUploadConfig   `toml:"custom"`
+}
+
+type TelegramUploadConfig struct {
+	BotToken string `toml:"bot_token"`
+	ChatID   string `toml:"chat_id"`
+}
+
+type DiscordUploadConfig struct {
+	WebhookURL string `toml:"webhook_url"`
+}
+
+type CustomUploadConfig struct {
+	Command string `toml:"command"`
 }
 
 func Default() *Config {
@@ -41,6 +61,18 @@ func Default() *Config {
 		Network: NetworkConfig{
 			Proxy:              "",
 			CookiesFromBrowser: "",
+		},
+		Upload: UploadConfig{
+			Telegram: TelegramUploadConfig{
+				BotToken: "",
+				ChatID:   "",
+			},
+			Discord: DiscordUploadConfig{
+				WebhookURL: "",
+			},
+			Custom: CustomUploadConfig{
+				Command: "",
+			},
 		},
 	}
 }

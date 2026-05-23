@@ -59,6 +59,9 @@ var (
 		writeThumbnail bool
 		writeSubs      string
 		writeAutoSubs  bool
+		maxConcurrent  int
+		embedMetadata  bool
+		uploadTarget   string
 	}
 )
 
@@ -134,6 +137,9 @@ func init() {
 	downloadCmd.Flags().BoolVarP(&downloadOpts.writeThumbnail, "write-thumbnail", "", false, "write thumbnail image and embed it")
 	downloadCmd.Flags().StringVarP(&downloadOpts.writeSubs, "write-subs", "", "", "write subtitles for given language(s) (e.g. en,es)")
 	downloadCmd.Flags().BoolVarP(&downloadOpts.writeAutoSubs, "write-auto-subs", "", false, "write auto-generated subtitles")
+	downloadCmd.Flags().IntVarP(&downloadOpts.maxConcurrent, "max-concurrent", "c", 3, "max parallel downloads")
+	downloadCmd.Flags().BoolVar(&downloadOpts.embedMetadata, "embed-metadata", false, "embed metadata/ID3 tags into downloaded file")
+	downloadCmd.Flags().StringVarP(&downloadOpts.uploadTarget, "upload", "u", "", "upload file after download (telegram, discord, custom)")
 
 	searchCmd.Flags().IntVarP(&searchOpts.limit, "limit", "l", 10, "max search results")
 
@@ -182,38 +188,56 @@ func downloadRun(cmd *cobra.Command, args []string) error {
 		WriteThumbnail: downloadOpts.writeThumbnail,
 		WriteSubs:      downloadOpts.writeSubs,
 		WriteAutoSubs:  downloadOpts.writeAutoSubs,
+		EmbedMetadata:  downloadOpts.embedMetadata,
+		UploadTarget:   downloadOpts.uploadTarget,
 	}
 
+	// Sanitize all URLs first
+	var urls []string
 	for _, rawURL := range args {
 		url := downloader.SanitizeURL(rawURL)
 		if url != rawURL {
 			fmt.Printf("  Cleaned URL: %s\n", url)
 		}
+		urls = append(urls, url)
+	}
 
-		if interactive {
-			if containerFmt == "" {
-				selected, err := tui.SelectContainerFormat()
-				if err != nil {
-					return friendlyError("format selection cancelled", err)
-				}
-				containerFmt = selected
-				opts.Format = containerFmt
-			}
-
-			ctx := context.Background()
-			info, err := downloader.Info(ctx, url)
+	// Interactive format/resolution selection (applies to all URLs)
+	if interactive {
+		if containerFmt == "" {
+			selected, err := tui.SelectContainerFormat()
 			if err != nil {
-				return friendlyError("failed to fetch available formats", err)
+				return friendlyError("format selection cancelled", err)
 			}
-
-			quality, err := tui.SelectResolution(info)
-			if err != nil {
-				return friendlyError("resolution selection cancelled", err)
-			}
-			opts.Quality = quality
+			containerFmt = selected
+			opts.Format = containerFmt
 		}
 
-		if err := tui.Start(url, opts); err != nil {
+		// For interactive resolution, only probe the first URL
+		ctx := context.Background()
+		info, err := downloader.Info(ctx, urls[0])
+		if err != nil {
+			return friendlyError("failed to fetch available formats", err)
+		}
+
+		quality, err := tui.SelectResolution(info)
+		if err != nil {
+			return friendlyError("resolution selection cancelled", err)
+		}
+		opts.Quality = quality
+	}
+
+	// Route: single URL → classic TUI, multiple URLs → parallel multi-TUI
+	if len(urls) == 1 {
+		if err := tui.Start(urls[0], opts); err != nil {
+			return friendlyError("download failed", err)
+		}
+	} else {
+		maxConc := downloadOpts.maxConcurrent
+		if maxConc < 1 {
+			maxConc = 1
+		}
+		if err := tui.StartMulti(urls, opts, maxConc); err != nil {
 			return friendlyError("download failed", err)
 		}
 	}

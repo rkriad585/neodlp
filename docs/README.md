@@ -1,19 +1,18 @@
 # NeoDLP Documentation
 
-Welcome to the NeoDLP documentation.
+Welcome to the NeoDLP documentation. Here you can find detailed information about the architecture, commands, configuration, and developer guides for NeoDLP.
 
-## Quick links
+## Quick Links
 
-- [README](../README.md) — main project overview, install guide, usage examples
-- [CONTRIBUTING](../CONTRIBUTING.md) — how to contribute
-- [CODE_OF_CONDUCT](../CODE_OF_CONDUCT.md) — community guidelines
-- [SECURITY](../SECURITY.md) — security policy
+- [Root README](../README.md) — Main project overview, installation, and quick start guide
+- [CONTRIBUTING](../CONTRIBUTING.md) — Guidelines for contributing to NeoDLP
+- [CODE_OF_CONDUCT](../CODE_OF_CONDUCT.md) — Code of conduct
+- [SECURITY](../SECURITY.md) — Security policy
 
 ## Topics
 
 | Document | Description |
 |----------|-------------|
-| [Usage examples](../README.md#usage) | Download, info, config commands |
-| [Configuration](../README.md#configuration) | TOML config reference |
-| [Architecture](../README.md#how-it-works) | How NeoDLP works internally |
-| [Building](../README.md#building) | Build from source |
+| [Commands](commands.md) | In-depth reference for `download`/`dl`, `info`, `search`, `config`, `serve`, `watch`, and utility commands |
+| [Configuration](configuration.md) | TOML configuration format, keys, defaults, and CLI override options |
+| [Architecture](architecture.md) | Layered structure of NeoDLP, packages, and detailed data flow diagrams |

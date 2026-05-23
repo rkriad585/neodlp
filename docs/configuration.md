@@ -23,6 +23,16 @@ rate_limit = ""
 [network]
 proxy = ""
 cookies_from_browser = ""
+
+[upload.telegram]
+bot_token = ""
+chat_id = ""
+
+[upload.discord]
+webhook_url = ""
+
+[upload.custom]
+command = ""
 ```
 
 ## Reference
@@ -108,6 +118,20 @@ cookies_from_browser = "chrome"
 cookies_from_browser = "brave"
 ```
 
+### `[upload]` section
+
+Configure destinations for the `--upload` trigger.
+
+#### `upload.telegram`
+- `bot_token`: API token of your Telegram bot.
+- `chat_id`: Telegram channel, group, or user ID to post the media file to.
+
+#### `upload.discord`
+- `webhook_url`: Discord channel integration webhook URL.
+
+#### `upload.custom`
+- `command`: Command template run on complete. Supports `%file%` (absolute path), `%filename%` (file name only), and `%dir%` (target directory) placeholders.
+
 ## CLI overrides
 
 Every config key can be overridden at runtime with a command flag.
@@ -120,6 +144,9 @@ CLI flags take precedence over config file values.
 | `download.format` | `--format` / `-f` |
 | `download.rate_limit` | `--rate-limit` / `-r` |
 | `network.proxy` | `--proxy` / `-p` |
+| `upload.telegram.bot_token` | *(via --upload telegram)* |
+| `upload.discord.webhook_url` | *(via --upload discord)* |
+| `upload.custom.command` | *(via --upload custom)* |
 
 ## CLI management
 

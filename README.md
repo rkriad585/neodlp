@@ -7,7 +7,7 @@ Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp) under the hood. Built with
 ```
 ╭────────────────────── neodlp ──────────────────────╮
 │      Author : RK Riad Khan                         │
-│      Version: v0.1.0                               │
+│      Version: v0.2.1                               │
 │      Commit : 2b4b657                              │
 │      GitHub : rkriad585/neodlp                     │
 ╰────────────────────────────────────────────────────╯
@@ -18,7 +18,11 @@ Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp) under the hood. Built with
 ## Features
 
 - **1000+ sites** — YouTube, Instagram, Facebook, X/Twitter, TikTok, SoundCloud, Twitch, Vimeo, Reddit, Telegram, Dailymotion, Bandcamp, Mixcloud, Rumble, Bilibili, and more
-- **Interactive TUI** — real-time progress bar, speed, ETA, file size with BubbleTea
+- **Parallel TUI Queue** — Concurrent multi-download dashboard with individual progress bars, speed, and ETA rendering using BubbleTea
+- **REST API Daemon (`neodlp serve`)** — Run a background HTTP JSON service to trigger/track downloads remotely
+- **File/Folder Watcher (`neodlp watch`)** — Automate downloads by watching folders or text files for new links
+- **Metadata & Album Art Embedding** — Embed high-res thumbnails and ID3 tags natively with `--embed-metadata`
+- **Push-to-Cloud Uploaders** — Auto-upload finished downloads to Discord, Telegram, or custom shell scripts, clearing local files afterwards
 - **Audio extraction** — download audio-only as MP3
 - **Format selection** — MP4, MKV, WebM, MOV, AVI, FLV, MP3, M4A, Opus, WAV; quality presets (best, 1080p, 720p)
 - **Playlist control** — download single video or full playlist
@@ -100,8 +104,41 @@ neodlp dl -r 5M "https://youtu.be/dQw4w9WgXcQ"
 # Use proxy
 neodlp dl -p "http://127.0.0.1:8080" "https://youtu.be/dQw4w9WgXcQ"
 
-# Multiple URLs
-neodlp dl "https://youtu.be/abc" "https://youtu.be/xyz"
+# Multiple URLs (downloads in parallel, default 3 concurrent)
+neodlp dl "https://youtu.be/abc" "https://youtu.be/xyz" "https://youtu.be/123"
+
+# Concurrency control
+neodlp dl -c 5 "https://youtu.be/abc" "https://youtu.be/xyz"
+
+# Smart Metadata & ID3 tags embedding
+neodlp dl --embed-metadata "https://youtu.be/abc"
+
+# Post-download cloud upload (telegram/discord/custom)
+neodlp dl -u discord "https://youtu.be/abc"
+```
+
+### Background REST API Daemon
+
+Start the local REST API daemon server to queue and track downloads asynchronously from external apps, tools, or browser extensions:
+
+```bash
+# Start daemon on default host and port (127.0.0.1:12121)
+neodlp serve
+
+# Custom host and port
+neodlp serve --host 0.0.0.0 --port 8080
+```
+
+### Real-Time Folder/File Watcher
+
+Automatically monitor a file or directory for newly added links to download:
+
+```bash
+# Watch a specific text file (polls for URL appends, downloads, comments out)
+neodlp watch -f ~/watch_downloads.txt
+
+# Watch a directory for incoming *.txt / *.url batch files
+neodlp watch -d ~/watch_folder
 ```
 
 ### Search and download
@@ -195,6 +232,16 @@ rate_limit = ""
 [network]
 proxy = ""
 cookies_from_browser = ""
+
+[upload.telegram]
+bot_token = ""
+chat_id = ""
+
+[upload.discord]
+webhook_url = ""
+
+[upload.custom]
+command = ""
 ```
 
 ### Options
@@ -208,6 +255,10 @@ cookies_from_browser = ""
 | `download.rate_limit` | string | Bandwidth limit (e.g. `10M`, `5M`) |
 | `network.proxy` | string | Proxy URL (HTTP/HTTPS/SOCKS) |
 | `network.cookies_from_browser` | string | Browser to extract cookies from (e.g. `firefox`, `chrome`) |
+| `upload.telegram.bot_token` | string | Telegram bot credentials |
+| `upload.telegram.chat_id` | string | Target Telegram chat/channel destination |
+| `upload.discord.webhook_url` | string | Webhook URL for Discord attachments |
+| `upload.custom.command` | string | Shell command line containing `%file%` template variable |
 
 ---
 
@@ -218,35 +269,42 @@ cookies_from_browser = ""
 │   CLI    │────▶│Downloader│────▶│ yt-dlp  │────▶│  Media   │
 │  (Cobra) │     │  (Go)   │     │ (Binary) │     │  File    │
 └──────────┘     └──────────┘     └──────────┘     └──────────┘
-      │                │
-      │                ▼
-      │         ┌──────────┐
-      └────────▶│   TUI    │
-                │(BubbleTea)│
-                └──────────┘
+      │                │                                │
+      │                ▼                                ▼
+      │         ┌──────────┐                     ┌──────────┐
+      └────────▶│TUI / Queue│                    │ Uploader │
+                │(BubbleTea)│                    │ (Cloud)  │
+                └──────────┘                     └──────────┘
 ```
 
-1. **Cobra CLI** parses commands and flags in `cmd/root.go`
-2. **Downloader** (`internal/downloader/`) wraps `go-ytdlp` — handles config resolution, option mapping, and execution
-3. **yt-dlp** binary does the actual download work — auto-installed on first run
-4. **TUI** (`internal/tui/`) uses BubbleTea to render real-time progress via callback
-5. **Config** (`internal/config/`) manages TOML settings with `get/set/edit` commands
-6. **Banner** (`internal/banner/`) renders the ASCII identity banner
+1. **Cobra CLI** parses commands and flags (`download`, `search`, `serve`, `watch`, `config`)
+2. **Parallel Queue** (`internal/queue/`) schedules enqueued jobs concurrently inside goroutine worker pools
+3. **Downloader** (`internal/downloader/`) wraps `go-ytdlp` — handles metadata embedding and triggers hooks
+4. **TUI** (`internal/tui/`) renders single URL progress bars or multi-item dashboard views
+5. **Uploader** (`internal/uploader/`) executes Telegram/Discord API transfers or runs shell execution pipelines
+6. **Config** (`internal/config/`) handles configuration loading, saving, and command modifications
 
 ### Project structure
 
 ```
 ├── main.go                        # Entry point
-├── cmd/root.go                    # CLI commands & flags
+├── cmd/
+│   ├── root.go                    # CLI command registry & download command
+│   ├── serve.go                   # REST API daemon (neodlp serve)
+│   ├── watch.go                   # Folder/file watcher (neodlp watch)
+│   ├── self_update.go             # Binary auto-update command
+│   └── uninstall.go               # Self-uninstall flag actions
 ├── internal/
-│   ├── version/version.go         # Version & commit vars
-│   ├── banner/banner.go           # ASCII banner
-│   ├── config/config.go           # TOML config load/save
-│   ├── downloader/downloader.go   # Download engine
-│   └── tui/tui.go                 # BubbleTea real-time TUI
-├── .version                       # Version file (v0.1.0)
-├── Makefile                       # Unix build targets
-└── build.ps1                      # Windows build script
+│   ├── version/version.go         # Version metadata definitions
+│   ├── banner/banner.go           # ASCII banner builder
+│   ├── config/config.go           # Configuration TOML engine
+│   ├── queue/queue.go             # Concurrent orchestrator queue
+│   ├── uploader/uploader.go       # Cloud uploader targets
+│   ├── downloader/                # Downloader logic & extractors
+│   └── tui/                       # BubbleTea dashboards (single & multi)
+├── .version                       # Version definition file (v0.2.1)
+├── Makefile                       # Unix build automation rules
+└── build.ps1                      # Windows build automation script
 ```
 
 ---

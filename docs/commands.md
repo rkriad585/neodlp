@@ -58,6 +58,9 @@ neodlp dl -f --format-type mp4 "https://youtu.be/dQw4w9WgXcQ"
 | `--audio-only` | `-a` | `false` | Extract audio only (overrides `--quality`) |
 | `--rate-limit` | `-r` | *none* | Bandwidth limit (e.g. `10M`, `5M`) |
 | `--proxy` | `-p` | *none* | Proxy URL |
+| `--max-concurrent` | `-c` | `3` | Max parallel downloads for multi-URL queues |
+| `--embed-metadata` | | `false` | Smart tagging (inject ID3 metadata and cover artwork) |
+| `--upload` | `-u` | *none* | Auto-upload file after download: `telegram`, `discord`, `custom` |
 
 ### Examples
 
@@ -218,6 +221,49 @@ neodlp self-update [flags]
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--proxy` | `-p` | *none* | Proxy URL for downloading the update |
+
+## serve
+
+Start a local REST API daemon. This enables programmatically queueing and tracking downloads in the background via JSON-over-HTTP.
+
+```bash
+neodlp serve [flags]
+```
+
+### Flags
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--port` | `-p` | `12121` | Port to run the REST API server on |
+| `--host` | | `127.0.0.1` | Host interface binding (e.g. `0.0.0.0` for local network access) |
+
+### API Endpoints
+
+- `GET /api/health` — Status and uptime check.
+- `GET /api/jobs` — Retrieve progress, speed, status, and error info for all background jobs.
+- `POST /api/download` — Enqueue a new download task.
+  - JSON payload: `{"url": "...", "quality": "...", "format": "...", "audio_only": false, "embed_metadata": false, "upload": ""}`
+- `POST /api/jobs/<job_id>/cancel` — Gracefully cancel an ongoing download.
+
+---
+
+## watch
+
+Poll a local directory or text file for newly added URLs and download them automatically in the background.
+
+```bash
+neodlp watch [flags]
+```
+
+### Flags
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--file` | `-f` | *config watch.txt* | Specific text file to poll for URL strings |
+| `--dir` | `-d` | *none* | Specific directory to monitor for `*.txt` / `*.url` files |
+| `--poll-interval` | | `2s` | Checking frequency (e.g. `1s`, `2s`, `5s`) |
+
+---
 
 ## --selfuninstall (Flag)
 

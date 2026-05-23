@@ -11,6 +11,7 @@ import (
 	"github.com/lrstanley/go-ytdlp"
 	"neodlp/internal/config"
 	"neodlp/internal/downloader/extractor"
+	"neodlp/internal/uploader"
 )
 
 type Result struct {
@@ -31,6 +32,8 @@ type Options struct {
 	WriteThumbnail bool
 	WriteSubs      string
 	WriteAutoSubs  bool
+	EmbedMetadata  bool
+	UploadTarget   string
 }
 
 func resolveOpts(opts Options) (*config.Config, string, string, string, error) {
@@ -62,7 +65,9 @@ func applyOpts(dl *ytdlp.Command, opts Options, cfg *config.Config, quality, out
 		dl = dl.NoPlaylist()
 	}
 
-	if quality == "audio-only" || opts.AudioOnly {
+	isAudio := quality == "audio-only" || opts.AudioOnly
+
+	if isAudio {
 		dl = dl.ExtractAudio().
 			AudioFormat("mp3").
 			AudioQuality("0")
@@ -80,8 +85,12 @@ func applyOpts(dl *ytdlp.Command, opts Options, cfg *config.Config, quality, out
 		}
 	}
 
-	if opts.WriteThumbnail {
+	if opts.WriteThumbnail || isAudio {
 		dl = dl.WriteThumbnail().EmbedThumbnail()
+	}
+
+	if opts.EmbedMetadata || isAudio {
+		dl = dl.EmbedMetadata()
 	}
 
 	if opts.WriteSubs != "" {
@@ -123,6 +132,49 @@ func DownloadWithProgress(ctx context.Context, urls []string, opts Options, prog
 	return download(ctx, urls, opts, progressFn)
 }
 
+func findDownloadedFile(outputDir string, rawURL string, capturedFilename string) string {
+	if capturedFilename != "" {
+		if _, err := os.Stat(capturedFilename); err == nil {
+			return capturedFilename
+		}
+		// If capturedFilename doesn't exist, try resolving relative to outputDir
+		fullPath := filepath.Join(outputDir, filepath.Base(capturedFilename))
+		if _, err := os.Stat(fullPath); err == nil {
+			return fullPath
+		}
+	}
+
+	// Fallback 1: Extract files matching basename without extension
+	if capturedFilename != "" {
+		baseWithoutExt := strings.TrimSuffix(filepath.Base(capturedFilename), filepath.Ext(capturedFilename))
+		files, _ := filepath.Glob(filepath.Join(outputDir, baseWithoutExt+".*"))
+		if len(files) > 0 {
+			return files[0]
+		}
+	}
+
+	// Fallback 2: Look up video info to get ID and search outputDir for [ID].ext or [ID] in name
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	info, err := Info(ctx, rawURL)
+	if err == nil && info.ID != "" {
+		files, _ := os.ReadDir(outputDir)
+		for _, f := range files {
+			if !f.IsDir() && strings.Contains(f.Name(), "["+info.ID+"]") {
+				return filepath.Join(outputDir, f.Name())
+			}
+		}
+		// Try without brackets
+		for _, f := range files {
+			if !f.IsDir() && strings.Contains(f.Name(), info.ID) {
+				return filepath.Join(outputDir, f.Name())
+			}
+		}
+	}
+
+	return capturedFilename
+}
+
 func download(ctx context.Context, urls []string, opts Options, progressFn ytdlp.ProgressCallbackFunc) ([]Result, error) {
 	cfg, outputDir, quality, outFmt, err := resolveOpts(opts)
 	if err != nil {
@@ -145,15 +197,23 @@ func download(ctx context.Context, urls []string, opts Options, progressFn ytdlp
 	var results []Result
 
 	for _, url := range urls {
+		var capturedFilename string
+
 		dl := ytdlp.New().
 			Paths(outputDir).
 			Output("%(extractor)s - %(title)s [%(id)s].%(ext)s")
 
-		if progressFn != nil {
-			dl = dl.ProgressFunc(100*time.Millisecond, progressFn)
-		} else {
-			dl = dl.NoProgress()
+		// Create a local wrapper callback to capture the filename
+		innerProgressFn := func(prog ytdlp.ProgressUpdate) {
+			if prog.Filename != "" {
+				capturedFilename = prog.Filename
+			}
+			if progressFn != nil {
+				progressFn(prog)
+			}
 		}
+
+		dl = dl.ProgressFunc(100*time.Millisecond, innerProgressFn)
 
 		dl = applyOpts(dl, opts, cfg, quality, outFmt)
 
@@ -171,10 +231,21 @@ func download(ctx context.Context, urls []string, opts Options, progressFn ytdlp
 			return nil, fmt.Errorf("failed to download %s: %w", url, err)
 		}
 
+		// Resolve correct final post-processed file
+		resolvedFile := findDownloadedFile(outputDir, url, capturedFilename)
+
+		// Post-download cloud uploader hook
+		if opts.UploadTarget != "" && resolvedFile != "" {
+			if err := uploader.Upload(opts.UploadTarget, resolvedFile); err != nil {
+				fmt.Fprintf(os.Stderr, "  ! Cloud upload error: %v\n", err)
+			}
+		}
+
 		platform := extractPlatform(url)
 		results = append(results, Result{
 			URL:      url,
 			Platform: platform,
+			Filename: resolvedFile,
 		})
 	}
 
