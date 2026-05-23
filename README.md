@@ -70,7 +70,7 @@ On Windows:
 
 ### Dependencies
 
-NeoDLP auto-downloads the `yt-dlp` binary on first run — no manual installation required.
+NeoDLP installers automatically pre-download the official `yt-dlp` binary (v2026.03.17) during the installation process so that the application works out-of-the-box. If it is ever missing or deleted, NeoDLP will still auto-download it on first run.
 
 
 ---

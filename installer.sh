@@ -168,6 +168,39 @@ chmod +x "$BINARY_PATH"
 SIZE=$(du -h "$BINARY_PATH" | cut -f1)
 echo -e "  ${GREEN}✓ Successfully downloaded ${PROJECT_NAME} (${SIZE})${NC}"
 
+# 3.1 Download yt-dlp dependency
+case "${OS}" in
+    linux)
+        if [ "${ARCH}" = "amd64" ]; then
+            YTDLP_ASSET="yt-dlp"
+        else
+            YTDLP_ASSET="yt-dlp_linux_aarch64"
+        fi
+        ;;
+    darwin)
+        YTDLP_ASSET="yt-dlp_macos"
+        ;;
+esac
+
+YTDLP_DOWNLOAD_URL="https://github.com/yt-dlp/yt-dlp/releases/download/2026.03.17/${YTDLP_ASSET}"
+YTDLP_PATH="${BIN_DIR}/yt-dlp"
+
+echo -e "  Downloading yt-dlp dependency from ${YTDLP_DOWNLOAD_URL} ...\n"
+
+if command -v curl >/dev/null 2>&1; then
+    curl -L --progress-bar -o "$YTDLP_PATH" "$YTDLP_DOWNLOAD_URL" || true
+elif command -v wget >/dev/null 2>&1; then
+    wget --show-progress -O "$YTDLP_PATH" "$YTDLP_DOWNLOAD_URL" || true
+fi
+
+if [[ -f "$YTDLP_PATH" ]]; then
+    chmod +x "$YTDLP_PATH"
+    YTDLP_SIZE=$(du -h "$YTDLP_PATH" | cut -f1)
+    echo -e "  ${GREEN}✓ Successfully downloaded yt-dlp (${YTDLP_SIZE})${NC}"
+else
+    echo -e "  ${YELLOW}⚠ Warning: Failed to pre-download yt-dlp. neodlp will attempt to install it on first run.${NC}"
+fi
+
 # 4. Configure PATH Environment Variable
 printf "  Configuring shell profile PATH configurations ... "
 PROFILES=(

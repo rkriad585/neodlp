@@ -141,6 +141,23 @@ try {
     exit 1
 }
 
+# 3.1 Download yt-dlp dependency
+$ytdlpUrl = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.03.17/yt-dlp.exe"
+$ytdlpPath = Join-Path $BinDir "yt-dlp.exe"
+Write-Host "  Downloading yt-dlp dependency from $ytdlpUrl ...`n"
+try {
+    $oldProgressPreference = $ProgressPreference
+    $ProgressPreference = 'SilentlyContinue'
+    Invoke-WebRequest -Uri $ytdlpUrl -OutFile $ytdlpPath -UseBasicParsing
+    $ProgressPreference = $oldProgressPreference
+    $ytdlpSize = [math]::Round((Get-Item $ytdlpPath).Length / 1MB, 2)
+    Write-Host "  ✓ Successfully downloaded yt-dlp.exe (${ytdlpSize} MB)" -ForegroundColor Green
+} catch {
+    $ProgressPreference = $oldProgressPreference
+    Write-Host "  ✗ Failed to download yt-dlp dependency." -ForegroundColor Red
+    Write-Warning "yt-dlp could not be pre-downloaded, but neodlp will attempt to install it on first run."
+}
+
 # 4. Update PATH Environment Variable
 Write-Host "  Configuring PATH environment variable ... " -NoNewline
 $userPath = [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::User)
